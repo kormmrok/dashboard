@@ -3,6 +3,7 @@
 import dash
 from dash import dcc
 from dash import html
+from dash import dependencies
 from dash.html.Div import Div
 from dash.html.Table import Table
 from dash.html.Tr import Tr
@@ -36,13 +37,13 @@ app.layout = html.Div(children=[
     html.Div([
         html.Div('Wykonawca: ', className='etykieta'),
         html.Div([
-            dcc.Dropdown(id='wykonawca')], className='dropdown')
+            dcc.Dropdown(id='wykonawca', placeholder='Wpisz nazwę wykonawcy...')], className='dropdown')
         ], style={'display':'flex'}),
     html.Div([
-    html.Div('Tytuł: ', className='etykieta'),
-        html.Div([
-            dcc.Dropdown(id='tytul')], className='dropdown')
-        ], style={'display':'flex'}),
+        html.Div('Tytuł: ', className='etykieta'),
+                html.Div([
+            dcc.Dropdown(id='tytul', placeholder='Wybierz utwór...')], className='dropdown')
+    ], style={'display':'flex'}),
     html.Div([], id='tabela'),
     html.Div([], id='utwor-1'),
     ])
@@ -50,13 +51,16 @@ app.layout = html.Div(children=[
 
 @app.callback(
     dash.dependencies.Output("wykonawca", "options"),
-    [dash.dependencies.Input("wykonawca", "search_value")],
+    [dash.dependencies.Input("wykonawca", "search_value"),
+    dash.dependencies.Input("tytul", "options")]
 )
-def zwrot_listy(search_value):
+def zwrot_listy(search_value, opcje):
     
     options = []
     
-    if not search_value:
+    if not search_value and not opcje:
+        return options
+    elif not search_value:
         raise PreventUpdate
     if len(search_value)>1:
         wynik = baza("SELECT DISTINCT wykonawca FROM lp3 WHERE wykonawca LIKE " + "'%" + search_value.replace("'", "''") + "%'" + ";")       
@@ -68,20 +72,23 @@ def zwrot_listy(search_value):
 
 
 @app.callback(
-    dash.dependencies.Output("tytul", "options"),
-    [dash.dependencies.Input("wykonawca", "value")]
+     dash.dependencies.Output("tytul", "options"),
+    [dash.dependencies.Input("wykonawca", "value"),
+    dash.dependencies.Input("wykonawca", "search_value")]
 )
-def utwory(value):
+def utwory(value, search_value):
     options = []
     
     if not value:
-        raise PreventUpdate
+        return options
+#        raise PreventUpdate
     
     wynik = baza("SELECT DISTINCT tytul FROM lp3 WHERE wykonawca='" + value.replace("'", "''") +"' ORDER BY tytul;")
     wynik_list = [list(i) for i in wynik]
     
     for i in wynik_list:
         options.append({"label" : i[0], "value" : i[0]})
+    
     return options
 
 
@@ -94,16 +101,20 @@ def utwory(value):
 def wykres(tytul, wykonawca):
         
     if not tytul or not wykonawca:
-        raise PreventUpdate
+        return [html.Div(), html.Div()]
+#        raise PreventUpdate
     
     dataframe = baza("SELECT distinct pozycja, notowanie, data_notowania FROM lp3 where tytul='"+ tytul.replace("'", "''") + "' and wykonawca='" + wykonawca.replace("'", "''") + "';")
-    df = pd.DataFrame(dataframe, columns=['pozycja', 'notowanie', 'data_notowania'])
     
-    fig = px.line(df, x='data_notowania', y='pozycja', title=wykonawca+" - "+tytul, markers=True, text='notowanie')
-    fig.update_yaxes(autorange = "reversed", title_text = 'Pozycja', title_standoff = 25, ticks = 'inside')
-    fig.update_xaxes(tickformat='%d-%m-%Y', title_text = 'Data notowania', title_standoff = 25, tickangle = 45, tickvals=df['data_notowania'].tolist(), ticks = 'inside')
+    df = pd.DataFrame(dataframe, columns=['pozycja', 'notowanie', 'data_notowania'])
+    if len(df) == 0:
+        return [html.Div(), html.Div()]
+    
+    fig = px.line(df, x='data_notowania', y='pozycja', markers=True, text='notowanie')
+    fig.update_yaxes(title_font=dict(size=18, family='Verdana', color='blue'), autorange = "reversed", title_text = 'Pozycja', title_standoff = 25, ticks = 'inside', tickvals=[1,5,10,15,20,25,30,35,40,45,50])
+    fig.update_xaxes(title_font=dict(size=18, family='Verdana', color='blue'), tickformat='%d-%m-%Y', title_text = 'Data notowania', title_standoff = 25, tickangle = 45, tickvals=df['data_notowania'].tolist(), ticks = 'inside')
     fig.update_traces(textposition="bottom center")
-
+    
     pozycja_naj = df['pozycja'].min()
     tygodnie = len(df)
     
