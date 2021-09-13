@@ -12,9 +12,12 @@ import plotly.express as px
 from dash.exceptions import PreventUpdate
 import mysql.connector
 
+# funkcja baza do łączenia się z bazą danych i wykonywanie poleceń SQL
+# przy dużym ruchu powinno się zastosować dataframe jako bufor w zapytaniach, aby zmniejszyć ich liczbę
+# Poniżej należy wprowadzić odpowiednie dane aby móc połączyć się z zaimportowaną bazą danych
 
 def baza(sql_query):
-     # łączenie z bazą danych
+    
     mydb = mysql.connector.connect(
         host = 'localhost',
         user = 'python',
@@ -29,6 +32,8 @@ def baza(sql_query):
     mydb.close()
     return wynik
 
+# definicja layoutu dashboardu. W layoucie znajdują się dwa puste segmenty, które uzupełniane są później
+# przez callback w powiązaniu z nazwą utworu
 
 app = dash.Dash(__name__)
 
@@ -44,10 +49,14 @@ app.layout = html.Div(children=[
                 html.Div([
             dcc.Dropdown(id='tytul', placeholder='Wybierz utwór...')], className='dropdown')
     ], style={'display':'flex'}),
+    html.P(style={'padding':'10px'}),
     html.Div([], id='tabela'),
     html.Div([], id='utwor-1'),
     ])
 
+# callback związany z dropdown określającym wykonawcę. Jego zadaniem jest odczytanie wyszukiwanej frazy i przekazanie
+# zapytania do bazy dany w celu znalezienia zespołu z wyszukiwaną frazą w nazwie. W rezultacie otrzymujemy listę,
+# która jest zwracana do dropdown-u jako opcje do wyboru
 
 @app.callback(
     dash.dependencies.Output("wykonawca", "options"),
@@ -71,6 +80,8 @@ def zwrot_listy(search_value, opcje):
     return [o for o in options if search_value.casefold() in o["label"].casefold()]
 
 
+# callback przesyłający listę utworów wybranego wykonawcy do dropdownu tytul jako listę opcji do wyboru
+
 @app.callback(
      dash.dependencies.Output("tytul", "options"),
     [dash.dependencies.Input("wykonawca", "value"),
@@ -91,6 +102,9 @@ def utwory(value, search_value):
     
     return options
 
+
+# callback uzupełniający layout o tabelę ze statystykami (nawyższa pozycja i ilość tygodni na liście)
+# oraz wykras pokazujący pozycję, numer notowania i datę notowania na wykresie liniowym
 
 @app.callback(
     [dash.dependencies.Output("utwor-1", "children"),
@@ -121,14 +135,11 @@ def wykres(tytul, wykonawca):
     return [dcc.Graph(figure=fig),
         html.Table([
             html.Tr([
-                html.Td('Najwyższa pozycja', className='statystyka_nazwa'),
-                html.Td(pozycja_naj, className='statystyka_wartosc'),
-                html.Td('Ilość tygodni na liście', className='statystyka_nazwa'),
-                html.Td(tygodnie, className='statystyka_wartosc')
-            ], className='tr'),
-            html.Tr([
-#               html.Td('Ilość tygodni na liście', className='statystyka_nazwa'),
-#              html.Td(tygodnie, className='statystyka_wartosc')
+                html.Td([html.Div('Najwyższa pozycja: ', className='statystyka_nazwa'),
+                html.Div(pozycja_naj, className='statystyka_wartosc')], style={'display':'flex'}),
+                html.Td(style={'column-width':'200px'}),
+                html.Td([html.Div('Ilość tygodni na liście:  ', className='statystyka_nazwa'),
+                html.Div(tygodnie, className='statystyka_wartosc')], style={'display':'flex'})
             ], className='tr'),
         ], className='tabela')
     ]
